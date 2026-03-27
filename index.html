@@ -1,108 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Glass Railing 3D Viewer</title>
+  <meta charset="UTF-8" />
+  <title>3D Model Viewer</title>
   <style>
-    body { margin:0; overflow:hidden; font-family:sans-serif; background:#f0f0f0; }
-    #loader {
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 1.2rem;
-      color: #555;
-      text-align: center;
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f5f5f5;
     }
-    canvas { display:block; }
-    #bg-selector {
-      position: fixed;
-      top: 10px; right: 10px;
-      background: rgba(255,255,255,0.8);
-      padding: 5px 10px; border-radius: 5px;
-      font-size: 0.9rem;
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: Arial;
+      color: #666;
     }
   </style>
 </head>
-<body>
 
-<div id="loader">Loading 3D Model...</div>
-<div id="bg-selector">
-  Background: 
-  <select id="bg-color">
-    <option value="#f0f0f0">Light</option>
-    <option value="#000000">Dark</option>
-    <option value="#87ceeb">Sky Blue</option>
-  </select>
-</div>
+<body>
+<div id="loading">Loading 3D Model...</div>
 
 <script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-  import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
-  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+  // ✅ 正确引入 three（关键修复点）
+  import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js";
 
-  // 场景 & 摄像机
+  import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/controls/OrbitControls.js";
+
+  import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/loaders/GLTFLoader.js";
+
+  // 场景
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 1, 3);
+  scene.background = new THREE.Color(0xf5f5f5);
+
+  // 相机
+  const camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(2, 2, 5);
 
   // 渲染器
-  const renderer = new THREE.WebGLRenderer({antialias:true});
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
   document.body.appendChild(renderer.domElement);
 
-  // 光源
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-  dirLight.position.set(5,5,5);
-  scene.add(dirLight);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-  // 控制器
+  // 控制器（可以旋转）
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
 
-  // 模型加载
+  // 灯光
+  const light1 = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+  scene.add(light1);
+
+  const light2 = new THREE.DirectionalLight(0xffffff, 1);
+  light2.position.set(5, 10, 7);
+  scene.add(light2);
+
+  // 坐标辅助（可删）
+  const axesHelper = new THREE.AxesHelper(1);
+  scene.add(axesHelper);
+
+  // ✅ 加载模型（你只需要改这里）
   const loader = new GLTFLoader();
-  loader.load('glass_railing2.glb',
-    function(gltf){
+
+  loader.load(
+    "./glass_railing2.glb", // 👉 改成你的模型路径
+    function (gltf) {
       const model = gltf.scene;
-      model.scale.set(1,1,1); // 根据实际情况调整
-      model.position.set(0,0,0);
+
+      // 自动居中
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+
       scene.add(model);
-      document.getElementById('loader').style.display = 'none';
+
+      document.getElementById("loading").style.display = "none";
     },
-    function(xhr){
-      // 可显示百分比进度
-      const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
-      document.getElementById('loader').innerText = `Loading 3D Model... ${percent}%`;
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
     },
-    function(error){
-      document.getElementById('loader').innerText = 'Failed to load model.';
-      console.error(error);
+    function (error) {
+      console.error("加载失败:", error);
     }
   );
 
-  // 背景切换
-  const bgSelector = document.getElementById('bg-color');
-  bgSelector.addEventListener('change', (e) => {
-    scene.background = new THREE.Color(e.target.value);
-  });
-
-  // 窗口自适应
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth/window.innerHeight;
+  // 自适应
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // 动画循环
-  function animate(){
+  // 渲染循环
+  function animate() {
     requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
   }
+
   animate();
 </script>
-
 </body>
 </html>
